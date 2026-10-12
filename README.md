@@ -1,20 +1,4 @@
-# Privacy Conductor
 
-Research artifact for **"Privacy Conductor: An Architectural Enforcement of
-Contextual Integrity in LLM-Based Document Retrieval."**
-
-The paper argues that the normative question in access control — *who ought to
-receive this document* — should not be answered by a language model. It presents
-a deterministic gate that enforces a policy written by an accountable authority,
-verifies the gate against its specification on all 2,520 flows of a synthetic
-clinic corpus, and then measures what happens when a model is substituted for the
-human who wrote the labels.
-
-Everything needed to reproduce the paper's tables and figures is in this
-repository, including the raw model outputs, so the scoring can be re-run without
-spending a single API call.
-
----
 
 ## Quick start
 
