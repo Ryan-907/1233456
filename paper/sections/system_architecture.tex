@@ -1,0 +1,137 @@
+\section{The CI Labels and Policy Gate}
+\label{sec:system_arch}
+
+\subsection{The CI Label}
+\label{sec:label}
+A ruling should be explainable: although the gate decides each flow at request
+time, its decision is predictable from the label and policy written in advance.
+The label therefore encodes the parameters of an information
+flow~\cite{nissenbaum}. Recipient comes from the requester's credentials; Data
+Subject, Information Type, and Transmission Principle come from the document
+label; Sender is implicit, as it is always the Store.
+
+\begin{table}[t]
+\centering
+\caption{Fields of the document label that constrain each Contextual Integrity
+parameter.}
+\label{tab:ci-mapping}
+\footnotesize
+\resizebox{0.82\columnwidth}{!}{%
+\begin{tabularx}{\columnwidth}{@{}lX@{}}
+\toprule
+\textbf{CI parameter} & \textbf{Constraining label field(s)} \\
+\midrule
+Data subject           & \texttt{subject\_type} \\
+Sender                 & \emph{Implicit (always the Store)} \\
+Recipient              & \texttt{permitted\_receiver\_roles} \\
+Information type       & \texttt{sensitivity\_tier}, \texttt{pii\_attributes},
+                         \texttt{implied\_attributes}, \texttt{extra\_sensitive},
+                         \texttt{document\_type} \\
+Transmission principle & \texttt{governing\_principle} \\
+\bottomrule
+\end{tabularx}}
+\end{table}
+
+Each parameter serves auditability, decision making, or both. Data Subject
+defines who the document is about, and Recipient establishes the other half of
+the relationship. Information Type determines how tightly that relationship
+must be established: for sensitive tiers a permitted role is not sufficient,
+and the requester must also hold an authorized relationship with the subject.
+The transmission principle is not evaluated as a separate condition; the role
+and relationship requirements implement it, and \texttt{governing\_principle}
+records which principle they encode.
+
+While Contextual Integrity is granular about individuals, the label is written
+over \textit{classes}: the Recipient field could hold ``Doctor'' but never a
+specific physician. We call this field, \texttt{permitted\_receiver\_roles},
+the document's \textit{access-control list} (ACL). Individual-level
+authorization is carried by the assignment relation (Section~\ref{sec:gate}).
+Labels attach to whole documents, so a record containing both a diagnosis and
+a billing code is treated indivisibly.
+
+Not every field bears on the ruling. Table~\ref{tab:label-fields} separates the
+fields the gate decides from, those it reports in its justification, and those
+retained for provenance. The two deciding fields differ in kind: the tier is
+descriptive, and the document is evidence for it; the ACL is normative.
+
+\begin{table}[t]
+\centering
+\caption{Fields of the document label by their role in the gate's decision
+procedure.}
+\label{tab:label-fields}
+\footnotesize
+\resizebox{0.82\columnwidth}{!}{%
+\begin{tabularx}{\columnwidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Role in the gate} & \textbf{Label fields} \\
+\midrule
+Decides  & \texttt{permitted\_receiver\_roles}, \texttt{sensitivity\_tier} \\
+\addlinespace
+Explains & \texttt{document\_type}, \texttt{extra\_sensitive}, \texttt{governing\_principle} \\
+\addlinespace
+Records  & \texttt{originating\_context}, \texttt{subject\_type}, \texttt{pii\_attributes},
+           \texttt{implied\_attributes}, \texttt{extra\_sensitive\_reason},
+           \texttt{assignment\_required} \\
+\bottomrule
+\end{tabularx}
+}
+\end{table}
+
+\subsection{The CI Policy Gate}
+\label{sec:gate}
+The gate receives a request from the Assistant, resolves it to a set of
+candidate documents (Section~\ref{sec:retrievalpath}), and evaluates each as a
+potential flow. Each evaluation is a function of six inputs: the requester's
+role, that role's context, the requester's assignment set, and the document's
+ACL, tier, and subject. It returns a decision for each candidate and the rule
+that produced it.
+
+A role is authoritative only in the context that grants it. This follows from
+the (Agent, Role) pairing in the CI formalism~\cite{barth2006}: the same
+individual acting in a different capacity is a different principal. A Doctor
+acting in the administrative context is refused, because the Doctor role is
+authoritative only in the medical context.
+
+Beyond document labels, the {\em Policy Authority} maintains an
+\textit{assignment relation}: the subjects each requester holds an authorized
+relationship with. Requiring both a permitted role and an assignment separates
+this from ordinary role-based access control~\cite{sandhu1996}, under which any
+Doctor could access any patient's chart. The role establishes the scope of
+access; the assignment establishes need-to-know. A requester with no
+assignments can reach only documents whose tier does not require one
+(Table~\ref{tab:tiers}).
+
+\begin{table}[t]
+\centering
+\caption{Sensitivity tiers and whether each requires an assignment.
+\texttt{public} and \texttt{internal} documents concern the organization, so
+there is no subject to be assigned.}
+\label{tab:tiers}
+\footnotesize
+\resizebox{0.80\columnwidth}{!}{%
+\begin{tabularx}{\columnwidth}{@{}l>{\raggedright\arraybackslash}Xc@{}}
+\toprule
+\textbf{Tier} & \textbf{Content} & \textbf{Assignment} \\
+\midrule
+\texttt{public}              & Freely shareable; no private content                      & No  \\
+\texttt{internal}            & Organizational; not about an individual                   & No  \\
+\addlinespace
+\texttt{pii\_basic}          & Identifiers only, no clinical or financial content        & Yes \\
+\texttt{clinical\_standard}  & Diagnoses, medications, clinical history                  & Yes \\
+\texttt{clinical\_sensitive} & Mental health, substance use, HIV/AIDS, reproductive care & Yes \\
+\texttt{financial}           & Billing codes, insurance numbers, salary figures          & Yes \\
+\texttt{employment}          & Contracts, HR records, reviews, credentialing             & Yes \\
+\bottomrule
+\end{tabularx}
+}
+\end{table}
+
+The gate returns \textsc{Permit} only when every check holds; \textsc{Deny} is
+the default. On a denial, the system can either withhold the document silently
+or tell the model why.
+
+The decision is a function of these six inputs and nothing else: it does not
+consult the request text, the Assistant's reasoning, or any prior request, so
+identical requests yield identical decisions indefinitely (verified in
+Section~\ref{sec:conformance}). Appendix~\ref{app:alg} gives the decision
+procedure.

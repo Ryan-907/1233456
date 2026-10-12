@@ -1,0 +1,34 @@
+# --- credentials: never commit -------------------------------------------
+.env
+.env.*
+secrets.json
+*.key
+
+# --- python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- latex build products -------------------------------------------------
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.blg
+paper/*.synctex.gz
+paper/*.fls
+paper/*.fdb_latexmk
+
+# --- os -------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# NOTE: data/dataset.json is deliberately NOT ignored. It is the corpus every
+# result in the paper is computed over; the repository is not reproducible
+# without it. Likewise reports/ is tracked: the cached model outputs under
+# reports/labeler/ and reports/flow_judge/ let the scoring be re-run without
+# spending API calls.

@@ -1,0 +1,8 @@
+Large language model (LLM) that retrieve internal documents within an organization must decide
+who may receive them. Existing approaches based on Contextual Integrity ask the model to make that decision, so access depends on probabilistic reasoning. We present \emph{Privacy Conductor}, an architecture that removes the decision from the
+model: a deterministic gate enforces a policy written by an authority, and the model receives only what the requester may already see. On a synthetic clinical
+corpus of 2,520 requester--document flows, the gate reproduces its policy exactly, so the remaining risk lies in the document labels it reads. As label source is of primary importance, we compare LLM and human generated labels. Across seven configurations of six models from two model families, LLM-written labels degrade the policy in every case. Models assign a document's sensitivity
+tier correctly on 78--86\% of documents, but reproduce its access-control list
+on as few as 23\%. Relabeling the same documents five times with an identical request changes 13 to 124 access decisions per configuration, a result that
+does not depend on our own labels. On 214 flows from HIPAA court cases, the most accurate configuration (87.8\%) still permits 11 of the 20 disclosures the
+law prohibits. LLMs can describe what a document contains, but not decide who should receive it. Hence, we recommend privacy policy should be authored by accountable personnel and enforced outside the model.

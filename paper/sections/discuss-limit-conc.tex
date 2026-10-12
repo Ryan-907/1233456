@@ -1,0 +1,125 @@
+
+\section{Discussion}
+\label{sec:discussion}
+
+Models recover sensitivity tiers relatively well, with 78--86\% conformance and 87--99\% self-agreement, but they do not produce stable access-control lists (ACLs). The reason is structural: an ACL is not determined by document content alone. Regulation and context may constrain access, but an accountable \emph{Policy Authority} must supply the remaining policy.
+
+This underdetermination appears directly in the self-consistency results. Across identical relabelings, 13--124 of 2,520 access decisions change with no change in input; in four of seven configurations, most unstable decisions concern flows denied by the authored policy. Thus, labeling once fixes policy to an arbitrary draw, while labeling at request time allows access to vary across requests.
+
+Common mitigations do not remove this problem. Larger models are not consistently better: \emph{Opus 4.8} reaches 55\% ACL conformance, while \emph{GPT-5.4} reaches only 23\%, below its mini and nano variants. Disabling extended thinking slightly improves ACL agreement for \emph{Opus 4.8} but increases unstable unauthorized disclosures. Majority voting likewise provides no reliable recovery (Section~\ref{sec:controls}). These approaches fail because the missing ACL cannot be recovered from document content by greater capability, computation, or aggregation. External evaluation reinforces this result: the most accurate configuration on court-adjudicated flows still permits 11 of 20 prohibited disclosures.
+
+Because the gate is deterministic, each induced violation can be traced to a specific label field. This suggests a hybrid workflow: an LLM drafts descriptive labels, an accountable authority validates policy-sensitive fields such as the ACL, and the gate enforces the approved policy. Our results show that fully automated labeling is unreliable; evaluating this hybrid model is future work.
+
+\subsection{Limitations and Future Work}
+\label{sec:future}
+
+We identify the following limitation of the present study. Our corpus is synthetic, single-domain, and labeled by limited expert annotator. Because the 2,520 flows are generated from 105 documents, document-level diversity is the effective constraint. Most importantly, a single annotator prevents us from distinguishing model error from human disagreement. This limitation affects conformance results but not model self-consistency; future work should compare model stability with human--human agreement.
+
+Additional limitations remain. Labels are document-level although Contextual Integrity is defined over attributes; attribute-level policies may improve precision at greater annotation cost. Five draws provide only a coarse estimate of variability. The PrivaCI-Bench experiment is single-draw and judge-based, so it evaluates decision quality rather than the full architecture. We also do not measure retrieval ordering and assume non-adversarial participants. Although request phrasing is excluded from the gate, adversarial testing remains necessary in the future.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented \emph{Privacy Conductor}, which moves LLM-mediated access control to a deterministic gate enforcing authority-authored Contextual Integrity policies within LLM-based document retrieval. The gate itself is faithful to policy, but the enforced policy degrades when an LLM supplies the labels: tier conformance is 78--86\%, ACL conformance falls as low as 23\%, and repeated identical labeling changes 13--124 of 2,520 decisions. On HIPAA-derived flows, the most accurate configuration still permits 11 out of 20 prohibited disclosures. These findings support using LLMs for descriptive classification while keeping privacy-policy definition and enforcement under accountable, verified external control.
+
+\ignore{\section{Discussion}
+\label{sec:discussion}
+Models label the sensitivity tier well: 78\% to 86\% conformance and 87\% to
+99\% self-agreement across both providers. What they cannot do is hold an
+access-control list still. Asking a model for an ACL asks it to recover
+information the document does not carry, and what comes back is a plausible
+guess that differs on each occasion.
+
+This is what we mean by saying privacy norms are underdetermined rather than
+subjective. Underdetermined does not mean arbitrary. As the HIPAA example in
+Section~\ref{sec:intro} shows, regulation constrains who may see a record
+without fixing it for each record, and reading the record does not settle the
+question either. The {\em Policy Authority} in our architecture supplies that
+missing information.
+
+The self-consistency result does not depend on whether our labels are right. A
+model that assigns the same document different ACLs on five identical
+presentations does not implement a stable policy at all. Between 13 and 124 of
+2,520 decisions change with no change to any input, and for four of the seven
+configurations most of that movement falls on flows the policy denies. If the
+model labels once, the deployed policy is an arbitrary draw; if it labels at
+request time, access to the same record changes from request to request.
+
+A practitioner facing these results would reach first for three mitigations:
+\textit{choosing a larger model}, \textit{giving the model more reasoning}, and
+\textit{aggregating several draws}. None of them resolves the problem. Within
+Anthropic's family, the larger models reproduce the ACL more often, but the
+best, {\em Opus 4.8}, still does so on only 55\% of documents. Within OpenAI's,
+the largest model is the worst: {\em GPT-5.4} has the lowest ACL conformance in
+the study at 23\%, while {\em GPT-5.4-mini} and {\em GPT-5.4-nano} reach 80\%
+and 69\%. Neither comparison is a controlled manipulation. Disabling extended
+thinking on {\em Opus 4.8} does isolate one setting: it improves ACL
+self-agreement from 56\% to 62\%, but raises unstable unauthorized disclosures
+from 66 to 73 and widens the per-draw spread from 23 to 31 flows, so neither
+setting removes the instability.
+Majority voting does not help either (Section~\ref{sec:controls}). All three
+fail for the same reason: the ACL is not present in the document, so neither
+capability, nor additional computation, nor averaging can recover it.
+
+Benchmark accuracy is also a poor basis for selection: on court-adjudicated
+flows, the most accurate configuration still permits 11 of the 20 prohibited
+disclosures (Section~\ref{sec:privaci-results}).
+
+Because the gate is deterministic and faithful to its label, every induced
+violation traces to one field of one document
+(Section~\ref{sec:substitution-results}). A wrong decision is therefore
+repairable by editing that field, without retraining, retuning, or
+reprompting. An organization reviewing model-written labels checks one field
+on each of 105 documents rather than 2,520 decisions, and under the
+configurations in Table~\ref{tab:conformance} would correct it on 21 to 81 of
+them. This suggests a division of labor in which a model drafts the label, an
+accountable authority ratifies the ACL, and the gate enforces the result. Our
+evidence shows only that the fully automated form fails; whether this hybrid
+works needs its own evaluation.
+
+\subsection{Limitations and Future Work}
+\label{sec:future}
+Our corpus is synthetic, single-domain, and labeled by one expert annotator.
+Because the 2,520 flows are a cross product of agents and documents, the
+effective sample size is 105 documents, and the permit side of the
+taxonomy rests on fewer documents still. The single annotator is the most
+consequential gap: we cannot separate \emph{models disagree with us} from
+\emph{models disagree with any annotator}. This affects the conformance results
+but not the self-consistency results. A second independent annotator, allowing
+human--human agreement to be compared with model self-agreement, is the
+extension we intend next.
+
+Labels attach to documents, while Contextual Integrity is formulated over
+attributes; attribute-level labeling would make the gate more precise at a
+higher labeling cost. Five draws characterize a sampling distribution only
+coarsely, so we cannot distinguish heavy tails from wide variance. The
+PrivaCI-Bench experiment is judge-only and single-draw, and its free-text roles
+are not remapped onto our vocabulary, so it speaks to decision quality under
+an external authority rather than to our architecture. Because we enumerate
+flows at the decision point, the retrieval ordering of
+Section~\ref{sec:retrievalpath} is specified but not measured. Finally, we
+assume all participants act in good faith. Because request text is not an
+input to the gate, adversarial phrasing should not change its decisions, but
+this deserves empirical testing.
+
+\section{Conclusion}
+\label{sec:conclusion}
+We proposed {\em Privacy Conductor}, an architecture that moves an LLM's access
+decisions to a deterministic gate enforcing an authority-authored Contextual
+Integrity policy. The gate reproduces its policy on all 2,520 flows of our
+corpus, which places the remaining risk in the labels it enforces. When a
+language model writes those labels, the enforced policy degrades in all seven
+configurations tested. Models reproduce the sensitivity tier on 78\% to 86\% of
+documents but the ACL on as few as 23\%, and five identical relabelings change
+13 to 124 decisions. On HIPAA-derived flows, the most accurate configuration
+still permits 11 of 20 prohibited disclosures. Models should therefore be used
+for descriptive classification, while privacy policy should be authored by
+accountable people and enforced outside the model.
+}
+
+
+\section*{Acknowledgment}
+
+The authors acknowledge the use of \emph{Claude (Anthropic)} only for editorial purposes such as such as rewriting selected sentences and paragraphs to improve readability, and grammatical correctness. The authors reviewed and edited the output and take full responsibility for the content. Document contents in the synthetic corpus are part of the evaluation pipeline and generated by {\tt Sonnet 4.6} model, as described in Section~\ref{sec:data}.
+
+\bibliographystyle{IEEEtran}

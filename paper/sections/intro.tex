@@ -1,0 +1,32 @@
+\section{Introduction}
+\label{sec:intro}
+
+Large language models (LLMs) are becoming ubiquitous to retrieve an
+organization's own documents~\cite{lewis2020,yao2023}. In a medical clinic or an HR
+department, many of those documents contain restricted or sensitive information, so every retrieval (i.e., document access) raises an access-control question: should this requester receive this document?
+
+Prior work applying Contextual Integrity (CI)~\cite{nissenbaum} to LLM-based systems often delegates the assessment of whether an information flow is appropriate directly to the language model, yet such models frequently produce incorrect judgments~\cite{mireshghallah2024,shao2024,privacibench}. Even stronger models would still yield probabilistic decisions that may vary with subtle changes in request phrasing~\cite{sclar2024}. More fundamentally, CI evaluates an information flow relative to an established norm; it does not itself determine what that norm should be~\cite{barth2006}. For example, HIPAA may constrain who is permitted to access a clinical record, but it does not necessarily specify which nurse within a clinic should be authorized to access a particular patient's record. Such context-specific access decisions ultimately require an accountable human authority or governing body to define and enforce the applicable norm.
+
+
+In this paper, we propose \emph{Privacy Conductor}, an architecture that removes the access decision from the language model and puts a deterministic gate between the model and the document store. The gate enforces a CI policy written by a \textit{Policy Authority}: an
+individual, a group, or a regulation. The model receives only what the requester may already see, so it cannot disclose a record it was never given.
+
+The obvious shortcut is to have an LLM label each document once, offline, and let the gate enforce the result. The model would not decide individual requests, but it would write the policy. In this paper, we try to evaluate whether it can do that task reliably. Our primary contributions are:
+\begin{itemize}
+  \item We specify the gate and its CI label, which separates what a document
+  contains from who may receive it. As a correctness check, the gate reproduces
+  its policy on all 2,520 flows of a synthetic clinical corpus, so any later
+  failure traces to a label.
+  \item Substituting a model for the human labeler degrades the policy in all
+  seven configurations tested (six models, two providers). Models assign the
+  sensitivity tier correctly on 78--86\% of documents but reproduce the
+  access-control list (ACL) on as few as 23\%.
+  \item Relabeling the same documents five times with an identical request
+  changes 13 to 124 access decisions, so the resulting policy depends on which
+  run is kept. This result does not depend on our labels being correct.
+  \item Larger models, more reasoning, and majority voting do not fix this. On
+  214 flows from HIPAA court cases, the most accurate configuration still
+  permits 11 of 20 prohibited disclosures.
+\end{itemize}
+
+\noindent\textbf{Paper Organization.} Section~\ref{sec:background} reviews contextual integrity, LLM retrieval, and related work. Section~\ref{sec:design} presents the design principles and failure modes, and Section~\ref{sec:system_arch} describes the label and the gate. Section~\ref{sec:experiment} describes the experiments, and Section~\ref{sec:results} reports their results. Section~\ref{sec:discussion} discusses the findings and limitations, and Section~\ref{sec:conclusion} concludes.

@@ -1,0 +1,246 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{microtype}
+
+\newcommand{\ignore}[1]{}
+
+\lstset{basicstyle=\ttfamily\scriptsize, breaklines=true,
+  columns=fullflexible, keepspaces=true, aboveskip=3pt, belowskip=3pt}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Privacy Conductor: An Architectural Enforcement of Contextual Integrity in LLM-Based Document Retrieval}
+
+\author{\IEEEauthorblockN{Ryan Thornton, Mir Mehedi A. Pritom, Maanak Gupta, and Jessee Roberts}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{Tennessee Technological University}\\
+Cookeville, TN, USA \\
+\{rthornton42, mpritom, mgupta, jtroberts\}@tntech.edu}
+}
+
+
+\maketitle
+\begin{abstract}
+
+\input{sections/abstract}
+\end{abstract}
+\begin{IEEEkeywords}
+contextual integrity, LLM agents, LLM privacy, information flow control, access control in LLM
+\end{IEEEkeywords}
+\input{sections/intro}
+\input{sections/background}
+\input{sections/system_design_failure_mode}
+\input{sections/system_architecture}
+\input{sections/experiment}
+\input{sections/results}
+\input{sections/discuss-limit-conc}
+%\bibliographystyle{IEEEtran}
+\bibliography{sections/references}
+\appendices
+
+\section{Decision Procedure}
+\label{app:alg}
+Checks short-circuit on the first failure, and the requester's credentials are
+validated before any field of the document is consulted. Every path ends in an
+explicit decision, returned with the rule that produced it
+(Algorithm~\ref{alg:gate}).
+
+\begin{algorithm}[h]
+\caption{Gate decision for requester $r$ and document $d$}
+\label{alg:gate}
+\begin{algorithmic}[1]
+\Require requester $r$, document $d$
+\Ensure \textsc{Permit} or \textsc{Deny}
+\State \textbf{if} $r$ has no active role \textbf{then return} \textsc{Deny}
+\State $\rho \gets$ the active role of $r$
+\State \textbf{if} $\rho$ is not authoritative in its context
+  \textbf{then return} \textsc{Deny}
+\State \textbf{if} $\rho \notin d.\mathit{permittedRoles}$
+  \textbf{then return} \textsc{Deny}
+\State \textbf{if} $d$ has a subject, $d.\mathit{tier}$ requires an
+  assignment, and $d.\mathit{subject} \notin r.\mathit{assignments}$
+  \textbf{then return} \textsc{Deny}
+\State \textbf{return} \textsc{Permit}
+\end{algorithmic}
+\end{algorithm}
+
+\section{Corpus Composition}
+\label{app:dataset}
+The 105 documents span five originating contexts: Medical (47), Administrative
+(27), HR (21), Internal (9), and Public (1). Table~\ref{tab:doctypes} gives the
+number of documents in each tier and their types. Only clinical note and prior
+authorization occur at more than one tier  %which is the 
+(basis for document-type in Section~\ref{sec:substitution}).
+
+\begin{table}[!ht]
+\centering
+\caption{Document types by sensitivity tier, with per-type counts in
+parentheses.}
+\label{tab:doctypes}
+\footnotesize
+\resizebox{0.85\columnwidth}{!}{
+\begin{tabularx}{\columnwidth}{@{}lr>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Tier} & \textbf{$n$} & \textbf{Document types} \\
+\midrule
+\texttt{clinical\_standard}  & 39 & lab report (8), prescription (8), clinical
+  note (7), referral letter (6), discharge summary (5), radiology report (5) \\
+\texttt{financial}           & 25 & insurance claim (8), billing statement (6),
+  explanation of benefits (4), insurance verification (4), prior
+  authorization (3) \\
+\texttt{employment}          & 21 & salary letter (6), employment contract (5),
+  performance review (4), credentialing file (3), contractor agreement (3) \\
+\texttt{clinical\_sensitive} & 10 & mental health assessment (5), clinical
+  note (3), prior authorization (2) \\
+\texttt{internal}            &  9 & meeting agenda (3), policy memo (3), staff
+  schedule (3) \\
+\texttt{public}              &  1 & public pamphlet (1) \\
+\bottomrule
+\end{tabularx}
+}
+\end{table}
+
+\section{Labeling and Judging Prompts}
+\label{app:prompts}
+Both experiments use a fixed system prompt and a templated user prompt, with
+responses constrained to a structured schema. Every configuration receives
+identical text. A response that does not parse is retried twice and otherwise
+recorded as an explicit failure. Line breaks are set for column width; the
+prompts are otherwise verbatim.
+
+\textit{Label schema and policy vocabulary.} Only the first two fields reach
+the gate's decision.
+\begin{lstlisting}
+sensitivity_tier         : one of TIERS
+permitted_receiver_roles : list of ROLES
+extra_sensitive          : boolean
+governing_principle      : string
+
+TIERS = public, internal, pii_basic,
+        clinical_standard, clinical_sensitive,
+        financial, employment
+ROLES = Doctor, Nurse, Billing Specialist,
+        HR Manager, IT Contractor, Patient
+\end{lstlisting}
+
+\textit{Labeler system prompt.}
+\begin{lstlisting}
+You are a records-classification officer at Riverside
+Medical Clinic. Your job is to assign each document its
+access-control label under the clinic's fixed policy.
+You do NOT decide individual access requests - you label
+the document once, and a deterministic gate enforces
+your label thereafter.
+
+SENSITIVITY TIERS (choose exactly one):
+- public: no private info; freely shareable
+  (pamphlets, notices).
+- internal: org-internal, not private, not public
+  (schedules, agendas, policy memos).
+- pii_basic: identifiers only (name, DOB, address)
+  with no clinical/financial content.
+- clinical_standard: diagnoses, medications,
+  clinical history.
+- clinical_sensitive: mental health, substance use,
+  HIV/AIDS, reproductive care.
+- financial: billing codes, insurance numbers,
+  salary figures.
+- employment: employment contracts, HR records,
+  performance reviews, credentialing.
+
+ROLES that may be permitted to receive a document
+(list ALL that legitimately apply):
+- Doctor, Nurse: clinical care staff.
+- Billing Specialist: billing/insurance operations only.
+- HR Manager: employment/HR records only.
+- IT Contractor: no access to protected health
+  information.
+- Patient: the individual; may receive public materials.
+
+Guidance: grant the MINIMUM necessary roles. Clinical
+records go to clinical staff; financial records to
+billing; employment records to HR. Mental-health /
+substance-use / HIV records are extra-sensitive and
+restricted to Doctor only. Mark extra_sensitive true
+for those categories.
+
+Return the label as structured output.
+\end{lstlisting}
+
+\textit{Labeler user prompt.} For organization-level documents, the subject
+field reads \texttt{organization-level (no individual subject)}.
+\begin{lstlisting}
+Classify this clinic document.
+
+Title         : {title}
+Document type : {document_type}
+Subject       : {subject_name}
+
+--- DOCUMENT CONTENT ---
+{content}
+--- END CONTENT ---
+
+Assign the sensitivity tier, the full set of permitted
+receiver roles, whether it is extra-sensitive, and the
+governing principle.
+\end{lstlisting}
+
+\textit{Flow-judge system prompt} (Section~\ref{sec:privaci}). The judge
+returns a decision and rationale under a constrained schema.
+\begin{lstlisting}
+You are an expert on the U.S. HIPAA Privacy
+Rule (45 CFR Part 160 and Subparts A and E of
+Part 164). You will be shown a real-world
+information flow: who disclosed what health
+information to whom, for what purpose, and
+under what consent. Decide how the HIPAA
+Privacy Rule applies to THIS disclosure and
+return exactly one label:
+- "permit": HIPAA affirmatively permits this
+  disclosure - a provision allows it (with or
+  without individual authorization).
+- "prohibit": HIPAA prohibits this disclosure
+  as described - it violates the Privacy Rule.
+- "not applicable": HIPAA does not govern this
+  flow - e.g. the sender is not a covered
+  entity or business associate, or the
+  information is not protected health
+  information.
+Decide only from the flow described. Do not
+assume facts that are not stated. Give a
+one- to three-sentence rationale naming the
+relevant HIPAA principle.
+\end{lstlisting}
+
+\textit{Flow-judge user prompt.} The ground-truth label and governing articles
+are withheld. Flows with no recorded consent pass \texttt{none stated}.
+\begin{lstlisting}
+Information flow under review:
+
+Sender (role)    : {sender} [{sender_role}]
+Recipient (role) : {receiver} [{receiver_role}]
+Subject (role)   : {subject} [{subject_role}]
+Information type : {message_type}
+Purpose          : {transmission_principle}
+Consent          : {consent_form}
+
+Case narrative:
+{case_content}
+
+How does the HIPAA Privacy Rule apply to this
+disclosure?
+\end{lstlisting}
+
+\end{document}

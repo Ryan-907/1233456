@@ -1,0 +1,199 @@
+\section{Experimental Case Study}
+\label{sec:experiment}
+
+\subsection{Dataset}
+\label{sec:data}
+
+To evaluate our proposal, we constructed a synthetic dataset of 105 documents spanning 21 document types, 24 agents, and 2,520 information flows. Agents, document types, CI labels, and assignment relations were hand-authored. The 2,520 flows are the full cross product of 24 agents requesting 105 documents. Only document content and extracted attribute values were generated using Anthropic's \textit{Sonnet 4.6}. Dataset construction was specification-first: each document label was defined before generating content to satisfy it, so the generation prompt included the label. Section~\ref{sec:controls} examines whether this cue affects our results.
+
+Labels follow the schema in Section~\ref{sec:label}. The corpus covers six of seven sensitivity tiers, excluding \texttt{pii\_basic}; Appendix~\ref{app:dataset} reports the distribution. Ten documents are marked extra-sensitive; all are \texttt{clinical\_sensitive} with the single permitted role \{Doctor\}. Across the corpus, nine distinct permitted-role sets are used.
+
+The 24 agents include ten Patients, four Doctors, four Nurses, two Billing Specialists, two HR Managers, and two IT Contractors. Appendix~\ref{app:dataset} provides additional dataset details, including originating contexts. We also evaluate on the HIPAA split of PrivaCI-Bench~\cite{privacibench} in Section~\ref{sec:privaci}.
+
+\ignore{
+To evaluate our proposal, we created a synthetic dataset of 105 documents, 21
+document types, 24 agents, and 2,520 information flows. The agents, document
+types, and CI labels are hand-authored by an annotator; the 2,520 flows are the
+deterministic cross product of every agent (24) requesting every document
+(105). Only the document \emph{content} and its extracted attribute values are
+model-generated, by Anthropic's \textit{Sonnet 4.6}. Construction is
+specification-first: each document's label is authored first, and its content
+is then generated to satisfy that label, so the generation prompt contains the
+label. Section~\ref{sec:controls} tests whether this cue explains our findings.
+
+Labels follow the schema described in Section~\ref{sec:label}. The corpus
+realizes six of the seven sensitivity tiers, with no document labeled
+\texttt{pii\_basic}; Appendix~\ref{app:dataset} gives the counts. Ten documents
+are marked extra-sensitive. All ten are \texttt{clinical\_sensitive} and carry
+the single-role permitted set \{Doctor\}. The corpus uses nine distinct
+permitted-role sets in total.
+
+The 24 agents comprise ten Patients, four Doctors, four Nurses, two Billing
+Specialists, two HR Managers, and two IT Contractors. The assignment relation
+is hand-authored alongside the labels. Appendix~\ref{app:dataset} gives further detail, such as the list of originating contexts. We also use the HIPAA split of PrivaCI-Bench~\cite{privacibench} in a secondary experiment (Section~\ref{sec:privaci}).
+}
+
+\subsection{Flow Taxonomy}
+Each flow falls into one of six classes (Table~\ref{tab:flows}), derived from
+the requester's role and assignments against the document label. Classes F2, F4, and F6 share a single underlying predicate: the requester's
+role is absent from the document's permitted set. They differ only in why the Policy Authority narrowed that set: an orthogonal originating context (F6),
+heightened sensitivity (F4), or neither (F2). The taxonomy is therefore a descriptive partition over flows.
+
+The classes are imbalanced: 259 flows are expected to \textsc{Permit} and 2,261 to \textsc{Deny}, 1,620 of them in F6. We believe this is realistic, as any incompatible label results in a deny, and it allows stress testing against multiple deny reasons. Accuracy computed across all flows is therefore
+dominated by denials. F5 also comprises a single public-tier document requested by all 24 agents, so the \textsc{Permit} side rests on fewer documents than its flow count suggests.
+
+
+\begin{table}[!t]
+\centering
+\caption{Flow taxonomy over the 2,520 (agent, document) pairs.}
+\label{tab:flows}
+\footnotesize
+\resizebox{0.80\columnwidth}{!}{%
+\begin{tabularx}{\columnwidth}{@{}l>{\raggedright\arraybackslash}Xrc@{}}
+\toprule
+\textbf{ID} & \textbf{Condition} & \textbf{$n$} & \textbf{Expected} \\
+\midrule
+F1 & Permitted role, assigned to the subject      & 235   & \textsc{Permit} \\
+F2 & Role not permitted for the document          & 74    & \textsc{Deny}   \\
+F3 & Permitted role, not assigned to the subject  & 367   & \textsc{Deny}   \\
+F4 & Extra-sensitive record, role lacks access    & 200   & \textsc{Deny}   \\
+F5 & Public-tier document                         & 24    & \textsc{Permit} \\
+F6 & Request crosses a context boundary           & 1{,}620 & \textsc{Deny} \\
+\bottomrule
+\end{tabularx}}
+\end{table}
+
+
+\subsection{Substitution Protocol}
+\label{sec:substitution}
+
+Our central experiment replaces the human annotator with an LLM at a single point in the pipeline while holding all other components fixed. The model performs the same one-time labeling task: given a document, it assigns a CI label. These labels are then passed to the same deterministic gate, which adjudicates the same 2,520 flows over the same agents and hand-authored assignment relation. One \emph{draw} is a complete relabeling of all 105 documents and produces 2,520 re-adjudicated decisions.
+
+The model receives the labeling vocabulary: seven sensitivity tiers, six roles, and minimum-necessary guidance (Appendix~\ref{app:prompts}). This guidance includes category-level role rules, making the most restrictive class easier to recover and therefore biasing against our conclusion. The input includes the document title, type, subject name, and full content, but excludes the authored tier, permitted-role set, extra-sensitive flag, requester identity, and assignment relation. Thus, each document is labeled once independently of any access request, matching the human annotation process. Outputs are constrained to the label schema, yielding either a well-formed label or an explicit failure. Because only two returned fields affect gate decisions (Table~\ref{tab:label-fields}), our analysis in Section~\ref{sec:results} focuses first on those fields.
+
+Providing document type is deliberate because a deployed labeler would know the record type. It is also a strong cue: 19 of 21 types map to a single tier, fixing the tier for 90 of 105 documents and again making the task easier.
+
+To measure model variability, each document is labeled five times per model using identical inputs. Since the gate is deterministic, disagreement across draws reflects only model non-determinism. Across seven model configurations, this produces 3,675 labels and 88,200 adjudicated flows.
+
+\ignore{
+Our central experiment replaces the human annotator with a language model at
+exactly one point in the pipeline and holds everything else fixed. The model
+performs the one-time labeling task the annotator performed, reading a document
+and assigning its CI label. Those labels are supplied to the same gate, which
+adjudicates the same 2,520 flows against the same agents and the same
+hand-authored assignment relation. A single \emph{draw} is a complete
+relabeling of all 105 documents, and yields 2,520 re-adjudicated decisions.
+
+The model is given the policy vocabulary it must label into: the seven
+sensitivity tiers, the six roles, and the minimum-necessary guidance
+(Appendix~\ref{app:prompts}). That guidance states category-level role rules,
+which makes the most restricted class easier to recover and so biases against
+our own conclusion. It is given the document's title, document type, subject
+name, and full content. It is not given the authored tier, permitted role set,
+or extra-sensitive flag for any document. Nor is it given the identity of any
+requester or any part of the assignment relation: the document is labeled once,
+outside the context of any particular request, exactly as the annotator labeled
+it. Responses are constrained to the label schema, so a draw yields a
+well-formed label or an explicit failure. Only two of the returned fields reach
+the gate's decision (Table~\ref{tab:label-fields}), so our attribution in
+Section~\ref{sec:results} begins with those two.
+
+Supplying the document type is deliberate, since a labeler in deployment knows
+what kind of record it holds. It is also a strong cue: 19 of the 21 types occur
+at a single tier, so the type alone fixes the tier for 90 of the 105 documents.
+This makes the tier easy to recover, which again biases against our conclusion.
+
+We exploit the gate's determinism by repeating the substitution. Each document
+is labeled five times per model with an identical request, so disagreement
+across draws reads directly as the model's own non-determinism on a fixed
+input. Across the seven model configurations, this yields 3,675 labels and
+88,200 adjudicated flows.
+}
+
+\subsection{Models and Sampling}
+\label{sec:models}
+We compare seven model configurations spanning two providers: Anthropic's
+{\em Opus 4.8}, {\em Sonnet 5}, and {\em Haiku 4.5}; OpenAI's {\em GPT-5.4},
+{\em GPT-5.4-mini}, and {\em GPT-5.4-nano}; and {\em Opus 4.8} with extended
+thinking disabled. Italicized names are shorthand for the API identifiers
+\texttt{claude-opus-4-8}, \texttt{claude-sonnet-5}, \texttt{claude-haiku-4-5},
+\texttt{gpt-5.4}, \texttt{gpt-5.4-mini}, and \texttt{gpt-5.4-nano}. Every
+configuration receives an identical system prompt, user prompt, and output
+schema; only the transport differs, so a cross-provider comparison is a
+comparison of models rather than of harnesses.
+
+Two asymmetries are unavoidable. First, sampling: {\em Opus 4.8} and
+{\em Sonnet 5} reject sampling parameters, whereas {\em Haiku 4.5} and the
+OpenAI models accept them. We set the temperature to 0 for every OpenAI call
+where the endpoint permits it, so variance that persists in those models
+reflects non-determinism rather than deliberate sampling~\cite{atil2024}. The
+Anthropic configurations run at their default sampling settings, so their
+variance may include sampling; for {\em Opus 4.8} and {\em Sonnet 5}, this is
+also the only behavior a deployer can obtain. Second, reasoning: the Anthropic
+models use either adaptive thinking ({\em Opus 4.8}, {\em Sonnet 5}) or an
+explicit reasoning budget ({\em Haiku 4.5}), whereas the OpenAI models reported
+no reasoning tokens on any call. No reasoning setting is directly equivalent
+across the two families, which confounds any cross-provider claim. The seventh
+configuration addresses this: it holds the provider, model, prompt, and corpus
+constant and varies only the thinking setting.
+
+\subsection{Evaluation Metrics}
+\label{sec:measures}
+
+We use two classes of metrics. \textit{Label-dependent} metrics compare model-generated labels with the authored policy. \textit{Tier} and \textit{ACL conformance} measure the fraction of 105 documents for which the model exactly reproduces the authored sensitivity tier and permitted-role set, respectively. An \textit{induced privacy violation} occurs when the gate permits a flow under the model-generated label but denies it under the authored label; an \textit{induced over-block} is the converse. Both constitute norm violations (Section~\ref{sec:failuremodes}). The \textit{O:U} ratio compares role grants added to the authored set with those omitted, aggregated across the corpus, capturing the direction of labeling error independently of its magnitude. An added role affects a decision only when a requester holding that role also satisfies the assignment constraint.
+
+\textit{Label-independent} metrics assess consistency across repeated draws without consulting the authored policy. \textit{Label stability} is the fraction of documents for which all five draws agree, reported per field and for the complete label. An \textit{unstable flow} is one whose access decision differs across draws. We additionally report two policy-referenced instability measures: an \textit{unstable unauthorized disclosure}, where an unstable flow is denied by the authored policy, and \textit{Range}, the minimum and maximum number of induced privacy violations across the five draws.
+
+\ignore{\textit{Label-dependent} measures score a model's labels against the authored
+policy. \textbf{Tier} and \textbf{ACL} conformance are the share of the 105
+documents on which the model reproduces the authored sensitivity tier and
+permitted role set exactly. An \textbf{induced privacy violation} is a flow the
+gate permits under the model's label and denies under the authored label; an
+\textbf{induced over-block} is the converse. Both are norm violations
+(Section~\ref{sec:failuremodes}). The \textbf{O:U} ratio divides the role
+grants a model added to the authored set by the grants it withheld, aggregated
+across the corpus. It records the direction of error independently of its
+magnitude, and at the level of roles: an added role changes a decision only
+where a requester holding it also meets the assignment requirement.
+
+\textit{Label-independent} measures compare a model's draws to one another and
+never consult the authored policy, so they do not depend on our labels being
+correct. \textbf{Label stability} is the share of documents on which all five
+draws agree, reported per field and for the label as a whole. An
+\textbf{unstable flow} is one whose decision is not identical across all five
+draws. Two further measures combine instability with the authored policy: an
+\textbf{unstable unauthorized disclosure} is an unstable flow that the authored
+policy denies, so that a re-roll decides whether a restricted record is
+released, and \textbf{Range} gives the minimum and maximum induced violations
+across the five draws.
+}
+\subsection{Attribution and Controls}
+\label{sec:attribution}
+When a substituted label induces a violation, we attribute it using \textit{counterfactual flip-back}: each label field is restored to its authored value one at a time and the flow is re-adjudicated, isolating the field responsible for the decision change. Because the gate is a pure function of its inputs, this attribution is exact.
+
+We report three controls, with results in Section~\ref{sec:controls}. The \textit{generation cue} control addresses the specification-first dataset construction by comparing tier conformance within each tier against the overall rate, separating genuine cue effects from corpus composition. The \textit{inert-field} control flips \texttt{extra\_sensitive} for all 105 documents and re-adjudicates, verifying that a field ignored by the gate cannot affect a decision. The \textit{ensemble} control applies a five-draw majority vote per document to test whether aggregation recovers errors introduced by a single draw.
+
+%Where a substituted label induces a violation, we attribute it by \textit{counterfactual flip-back}: each label field is reverted to its authored value
+%one at a time and the flow re-adjudicated, which isolates the field responsible for the changed decision. Because the gate is a pure function of its inputs, this procedure is exact.
+
+%We report three controls, whose results appear in Section~\ref{sec:controls}. The \textit{generation cue} control addresses the specification-first construction of the data: we compare tier conformance within each tier against the gross rate, to separate a genuine cue from corpus composition. The \textit{inert-field} control inverts \texttt{extra\_sensitive} data on all 105 documents and re-adjudicates, verifying that a field the gate does not read cannot move a decision. The \textit{ensemble} control takes a five-draw majority vote per document and asks whether aggregation recovers what a single draw loses.
+
+\subsection{External Policy Authority}
+\label{sec:privaci}
+We run a second, narrower experiment on the HIPAA split of
+PrivaCI-Bench~\cite{privacibench}, whose 214 flows are transcribed from real
+court cases and labeled by the HIPAA articles a court found followed or
+violated~\cite{goldcoin}.
+
+This experiment is judge-only and deliberately contains no gate. Each flow is
+presented as its CI five-tuple plus the case narrative, without the
+ground-truth label or the governing articles, and the model returns
+\textsc{Permit}, \textsc{Prohibit}, or \textsc{Not Applicable}. All seven
+configurations are run over all 214 flows, single draw, for 1,498 judgments in
+total.
+
+We do not score the deterministic gate against this corpus, and the omission is
+principled. The gate is faithful to its policy by construction, so a decision
+conflicting with a court's would be a defect in the policy we wrote, not
+evidence about the mechanism. The corpus asks only whether models reproduce
+decisions whose authority is external to this paper.

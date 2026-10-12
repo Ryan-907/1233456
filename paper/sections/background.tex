@@ -1,0 +1,115 @@
+\section{Background and Related Works}
+\label{sec:background}
+\subsection{Contextual Integrity}
+
+Contextual Integrity (CI) defines privacy as the appropriateness of an
+\textit{information flow} to its \textit{context}~\cite{nissenbaum}. Each flow
+is described by five parameters: Data Subject, Sender, Recipient, Information
+Type, and Transmission Principle. A flow respects contextual integrity when
+\textit{all} five conform to the norms of the prevailing context.
+
+Barth et al.~\cite{barth2006} adopted CI for computer science, expressing norms
+derived from legislation in linear temporal logic; the norm is an input to
+their framework. Later work has instead elicited norms from people, through
+vignette surveys and factorial designs that measure what a population judges
+appropriate~\cite{martin2016,apthorpe2018}, including for LLM
+chatbots~\cite{tran2025}.
+
+\subsection{Retrieval and Agents}
+Retrieval-augmented generation conditions a model on documents fetched from an
+external store at inference time~\cite{lewis2020}, and tool-assisted agents
+extend this into a loop in which the model chooses when to query, what to query
+for, and how to act on the result~\cite{yao2023,schick2023}. The set of
+documents an agent will touch is therefore not known in advance. Models can
+also leak memorized training data~\cite{carlini2021}, and retrieval corpora add
+leakage channels of their own~\cite{zeng2024}.
+
+Ruan et al.~\cite{ruan2024} construct sandboxed emulations to surface the risks
+agents realize when acting with real permissions. Others show the instruction
+channel itself is unreliable: models can be diverted by adversarial
+instructions in their prompts~\cite{perez2022}, including instructions embedded
+in the documents they retrieve~\cite{greshake2023}. We read these findings as
+an argument about adjudicator placement: each describes a failure to comply
+with a constraint the model was asked to honor. Recent prompt-injection
+defenses also move enforcement outside the model, applying capability or
+information-flow policies to what an agent may do with the data it
+reads~\cite{debenedetti2026camel,costa2025fides}.
+
+\subsection{Contextual Integrity for Language Models}
+A growing body of work applies contextual integrity to language models
+directly. ConfAIde evaluates whether models respect contextual norms when
+handling information disclosed in conversation, finding that they frequently
+reveal what context forbids~\cite{mireshghallah2024}. PrivacyLens extends this
+from judgment to action, measuring norm violations in agent
+trajectories~\cite{shao2024}. Later benchmarks extend the evaluation to
+assistants on synthetic data~\cite{cheng2024cibench}, to persistent
+memory~\cite{mireshghallah2026cimemories}, and to enterprise agents working from
+retrieved documents, where larger models and deeper reasoning do not solve the
+problem~\cite{fu2026ciwork}. GoldCoin grounds the evaluation in law,
+generating cases from HIPAA provisions to test whether models reason correctly
+about statutory privacy~\cite{goldcoin}; Privacy Checklist uses language models
+to cover HIPAA's regulations in a checklist for detecting
+violations~\cite{li2025checklist}; and PrivaCI-Bench assembles flows from real
+court decisions so that the label authority is a ruling~\cite{privacibench}.
+Model judgments of CI norms change with small variations in the
+prompt~\cite{shvartzshnaider2024llmci}; we find they change even when the
+prompt is identical (Section~\ref{sec:selfconsistency}). Training models to
+reason about CI reduces inappropriate disclosure~\cite{lan2025}, but the model
+still makes the decision.
+
+A second line proposes architecture. AirGapAgent restricts the context
+available to a conversational agent so that it cannot disclose what it was
+never given~\cite{bagdasarian2024}, and Ghalebikesabi et
+al.~\cite{ghalebikesabi2024} operationalize contextual integrity in assistants
+by having the system reason explicitly about the appropriateness of each
+disclosure. These are the closest antecedents to our work, and we share their
+premise that limiting what reaches the model is more reliable than constraining
+what it does afterward.
+
+They differ from our proposal in what the model is asked to judge. In each case
+a model inference determines the normative question of who ought to receive the
+document, so the decision inherits the variance of the component making it. We
+instead require that the normative judgment be fixed in advance by an
+accountable policy authority, in a label the enforcement layer reads
+mechanically.
+
+\subsection{Privacy Conductor vs.\ RBAC, ABAC, and Conventional Policy Enforcement}
+The mechanism we use is not new. Role-based access control has governed
+enterprise data for decades~\cite{sandhu1996}, attribute-based access control
+generalizes it to arbitrary properties of the subject, resource, and
+environment~\cite{hu2014abac}, and our gate is recognizably a policy decision
+point in that tradition. Retrieval pipelines already filter documents by role
+before the model sees them~\cite{chen2025sac}, while Permissioned LLMs enforce
+access control inside the model, with adapters fine-tuned per access
+domain~\cite{jayaraman2025permissioned}.
+
+\begin{table}[!t]
+\centering
+\caption{Privacy Conductor (PC) compared with conventional policy enforcement
+and LLM-mediated Contextual Integrity (LLM-CI).}
+\label{tab:comparison}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\resizebox{0.82\columnwidth}{!}{\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}Xllll@{}}
+\toprule
+\textbf{Property} & \textbf{RBAC} & \textbf{ABAC} & \textbf{LLM-CI} & \textbf{PC} \\
+\midrule
+Role-aware                         & Yes     & Yes            & Potentially & Yes \\
+Subject relationship               & Limited & Yes            & Potentially & Yes \\
+Contextual transmission principle  & No      & Expressible    & Yes         & Explicit \\
+Deterministic decision             & Yes     & Yes            & No          & Yes \\
+LLM inside policy decision         & No      & No             & Usually     & No \\
+Request text affects authorization & Rarely  & Depends        & Often       & No \\
+CI-oriented audit explanation      & No      & Not inherently & Potentially & Yes \\
+\bottomrule
+\end{tabularx}
+}
+\end{table}
+
+Table~\ref{tab:comparison} gives the comparison. The gate combines a role
+condition with a relationship condition~\cite{fong2011}
+(Section~\ref{sec:gate}), so it conforms to its specification by construction.
+What differs is placement and provenance: it sits inside the retrieval path,
+never reads the request text, and enforces a policy written by an accountable
+authority. The novelty is the separation of model reasoning from normative
+privacy authorization.
